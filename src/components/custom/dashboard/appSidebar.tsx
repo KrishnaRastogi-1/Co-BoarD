@@ -12,7 +12,7 @@ import {
     SidebarMenuButton,
 } from "@/components/ui/sidebar"
 import { useUser } from "@clerk/nextjs"
-import { Archive, LucideLayoutGrid, Settings, Sparkle, UserPlus } from "lucide-react"
+import { Archive, LucideLayoutGrid, Plus, Settings, Sparkle, UserPlus } from "lucide-react"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
 
@@ -27,7 +27,7 @@ export function AppSidebar() {
             </SidebarHeader>
             <SidebarContent>
                 <SidebarGroup >
-                    <Button>+ Create New Board</Button>
+                    <Button><Plus /> Create New Board</Button>
                 </SidebarGroup>
                 <SidebarGroup >
                     <SidebarGroupLabel>My Boards</SidebarGroupLabel>
@@ -57,7 +57,7 @@ export function AppSidebar() {
                 </SidebarGroup>
             </SidebarContent>
             <SidebarFooter>
-                <Button>+ Create New Board</Button>
+                <Button><Plus /> Create New Board</Button>
                 <div className="p-4 my-3 border rounded-md">
                     <h2 className="text-sm flex justify-between mb-1">2 files created <span>total 3</span></h2>
                     <Progress value={66} className="h-2 mt-2" />
