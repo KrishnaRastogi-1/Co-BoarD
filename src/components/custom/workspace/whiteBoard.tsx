@@ -8,6 +8,8 @@ import dynamic from "next/dynamic";
 import "./whiteboard.css"
 import { Hand, MousePointer, Square, Circle, Diamond, ArrowRight, Eraser, Pencil, TypeIcon, Image } from "lucide-react";
 import { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+import FloatingProperties from "./floatingProperties";
+import { version } from "os";
 
 const tools = [
     {
@@ -73,8 +75,27 @@ export default function Whiteboard() {
      const saveTimeRef = useRef<any>(null);
      const { projectId } = useParams();
      const [activeTools, setActiveTools] = useState("selection");
+     const [selectedElement, setSelectedElements] = useState<any>(null);
+     const [canvasState, setCanvasState] = useState<any>(null);
 
     const handleCanvasChange = (elements: readonly any[], appState: any, files: any) => {
+
+        setCanvasState(appState);
+
+        const selectedIds = Object.keys(
+            appState.selectedElementIds || {}
+        )
+
+        if (selectedIds?.length === 1) {
+            const element = elements.find(
+                (element) => element.id === selectedIds[0]
+            )
+
+            setSelectedElements(element)
+        } else {
+            setSelectedElements(null);
+        }
+
         if (saveTimeRef?.current) {
             clearTimeout(saveTimeRef.current)
         }
@@ -109,6 +130,55 @@ export default function Whiteboard() {
         })
     }
 
+    const getFloatingPosition = () => {
+        if (!selectedElement || !canvasState) {
+            return { left: 0, top: 0 }
+        }
+
+        const zoom = canvasState.zoom?.value ?? 1
+
+        const scrollX = canvasState.scrollX ?? 0
+    
+        const scrollY = canvasState.scrollY ?? 0
+
+        const centerX = selectedElement.x + selectedElement.width / 2
+
+        const screenX = (centerX + scrollX) * zoom
+
+        const screenY = (selectedElement.y + scrollY) * zoom
+
+        return {
+            left: screenX,
+            top: screenY - 60
+        }
+    }
+
+    const floatingPosition = getFloatingPosition();
+
+    const handlePropertyChange = (property: string, value: any) => {
+        if (!excalidrawAPI || !selectedElement) return;
+
+        const element = excalidrawAPI.getSceneElements();
+        const updatedElements = element.map((element) => {
+            if (element.id !== selectedElement.id) {
+                return element;
+            }
+
+            return {
+                ...element,
+                [property]: value,
+                version: element.version + 1,
+                updated: Date.now()
+            }
+        });
+
+        excalidrawAPI.updateScene({
+            elements: updatedElements
+        }); 
+
+    }
+        
+
     return (
         <div style={{ height: "93vh" }}>
             <Excalidraw 
@@ -124,6 +194,13 @@ export default function Whiteboard() {
                         </button>
                     )
                 })}
+            </div>
+            <div>
+                <FloatingProperties 
+                    selectedElement={selectedElement}
+                    position={floatingPosition}
+                    onPropertyChange={(property, value) => handlePropertyChange(property, value)}
+                />
             </div>
         </div>
     )
