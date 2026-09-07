@@ -177,7 +177,98 @@ export default function Whiteboard() {
         }); 
 
     }
+    
+    const HandleDeleteElement = () => {
+        if (!excalidrawAPI || !selectedElement) return;
+
+        const elements = excalidrawAPI.getSceneElements();
+        const updatedElements = elements.map((element) => {
+            if (element.id === selectedElement.id) {
+                return {
+                    ...element,
+                    isDeleted: true,
+                    version: element.version + 1,
+                    updated: Date.now()
+                }
+            }
+            return element;
+        });
+
+        excalidrawAPI.updateScene({
+            elements: updatedElements
+        })
+
+        setSelectedElements(null);
+    }
+
+    const HandleOnDuplicate = () => {
+        if (!excalidrawAPI || !selectedElement) return;
+
+        const elements = excalidrawAPI.getSceneElements();
+        const duplicateElement = {
+            ...selectedElement,
+            id: crypto.randomUUID(),
+            x: selectedElement.x + 20,
+            y: selectedElement.y + 20,
+            seed: Math.floor(Math.random() * 10000),
+            version: 1,
+            updated: Date.now(),
+            isDeleted: false,
+        };
+        excalidrawAPI.updateScene({
+            elements: [
+                ...elements,
+                duplicateElement
+            ]
+        })
+    }
+
+    const HandleBringFrontBack = (type: "front" | "back") => {
+        if (!excalidrawAPI || !selectedElement) return;
+        const elements = excalidrawAPI.getSceneElements();
+        const selectedElements = elements.filter((element) => element.id === selectedElement.id);
+
+        if (!selectedElement) return;
+
+        const remainingElements = elements.filter((element) => element.id !== selectedElement.id);
+       
+        if (type === "front"){
+            excalidrawAPI.updateScene({
+                elements: [
+                    ...remainingElements,
+                    selectedElement
+                ]
+            })
+        } else {
+            excalidrawAPI.updateScene({
+                elements: [
+                    selectedElement,
+                    ...remainingElements
+                ]
+            })
+        }
         
+    }
+
+    const HandleLockElement = () => {
+        if (!excalidrawAPI || !selectedElement) return;
+
+        const elements = excalidrawAPI.getSceneElements();
+        const updatedElements = elements.map((element) => {
+            if (element.id === selectedElement.id) {
+                return {
+                    ...element,
+                    locked: !element.locked,
+                    version: element.version + 1,
+                    updated: Date.now()
+                }
+            }
+            return element;
+        });
+        excalidrawAPI.updateScene({
+            elements: updatedElements
+        })
+    };  
 
     return (
         <div style={{ height: "93vh" }}>
@@ -200,6 +291,11 @@ export default function Whiteboard() {
                     selectedElement={selectedElement}
                     position={floatingPosition}
                     onPropertyChange={(property, value) => handlePropertyChange(property, value)}
+                    onDelete={() => HandleDeleteElement()}
+                    onDuplicate={() => HandleOnDuplicate()}
+                    onBringToFront={() => HandleBringFrontBack("front")}
+                    onSendToBack={() => HandleBringFrontBack("back")}
+                    onLock={() => HandleLockElement()}
                 />
             </div>
         </div>
