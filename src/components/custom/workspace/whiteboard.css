@@ -5,3 +5,7 @@
 .excalidraw .App-toolbar {
     display: none !important; 
 }
+
+.excalidraw .dropdown-menu-button.main-menu-trigger {
+    display: none !important;
+}
