@@ -6,10 +6,11 @@ import { useParams } from "next/navigation";
 import { useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import "./whiteboard.css"
-import { Hand, MousePointer, Square, Circle, Diamond, ArrowRight, Eraser, Pencil, TypeIcon, Image } from "lucide-react";
+import { Hand, MousePointer, Square, Circle, Diamond, ArrowRight, Eraser, Pencil, TypeIcon, Image, Sparkle } from "lucide-react";
 import { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import FloatingProperties from "./floatingProperties";
-import { version } from "os";
+import { Button } from "@/components/ui/button";
+import AIFloatingSidebar from "./aiFloatingSidebar";
 
 const tools = [
     {
@@ -71,12 +72,13 @@ const Excalidraw = dynamic(
 );
 
 export default function Whiteboard() {
-     const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawImperativeAPI | null>(null);
-     const saveTimeRef = useRef<any>(null);
-     const { projectId } = useParams();
-     const [activeTools, setActiveTools] = useState("selection");
-     const [selectedElement, setSelectedElements] = useState<any>(null);
-     const [canvasState, setCanvasState] = useState<any>(null);
+    const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawImperativeAPI | null>(null);
+    const saveTimeRef = useRef<any>(null);
+    const { projectId } = useParams();
+    const [activeTools, setActiveTools] = useState("selection");
+    const [selectedElement, setSelectedElements] = useState<any>(null);
+    const [canvasState, setCanvasState] = useState<any>(null);
+    const [showAiSidebar, setShowAiSidebar] = useState(false);
 
     const handleCanvasChange = (elements: readonly any[], appState: any, files: any) => {
 
@@ -138,7 +140,7 @@ export default function Whiteboard() {
         const zoom = canvasState.zoom?.value ?? 1
 
         const scrollX = canvasState.scrollX ?? 0
-    
+
         const scrollY = canvasState.scrollY ?? 0
 
         const centerX = selectedElement.x + selectedElement.width / 2
@@ -174,10 +176,10 @@ export default function Whiteboard() {
 
         excalidrawAPI.updateScene({
             elements: updatedElements
-        }); 
+        });
 
     }
-    
+
     const HandleDeleteElement = () => {
         if (!excalidrawAPI || !selectedElement) return;
 
@@ -231,8 +233,8 @@ export default function Whiteboard() {
         if (!selectedElement) return;
 
         const remainingElements = elements.filter((element) => element.id !== selectedElement.id);
-       
-        if (type === "front"){
+
+        if (type === "front") {
             excalidrawAPI.updateScene({
                 elements: [
                     ...remainingElements,
@@ -247,7 +249,7 @@ export default function Whiteboard() {
                 ]
             })
         }
-        
+
     }
 
     const HandleLockElement = () => {
@@ -268,11 +270,11 @@ export default function Whiteboard() {
         excalidrawAPI.updateScene({
             elements: updatedElements
         })
-    };  
+    };
 
     return (
         <div style={{ height: "93vh" }}>
-            <Excalidraw 
+            <Excalidraw
                 excalidrawAPI={(api: any) => setExcalidrawAPI(api)}
                 onChange={handleCanvasChange}
             />
@@ -281,13 +283,13 @@ export default function Whiteboard() {
                     const Icon = tool.icon;
                     return (
                         <button key={tool.name} onClick={() => changeTool(tool.name)} className={`flex h-10 w-10 items-center justify-center hover:bg-slate-100 rounded-xl transition-colors cursor-pointer ${activeTools === tool.name ? "bg-primary/10" : ""}`}>
-                            <Icon size="19" className={tool.color}/>
+                            <Icon size="19" className={tool.color} />
                         </button>
                     )
                 })}
             </div>
             <div>
-                <FloatingProperties 
+                <FloatingProperties
                     selectedElement={selectedElement}
                     position={floatingPosition}
                     onPropertyChange={(property, value) => handlePropertyChange(property, value)}
@@ -298,6 +300,20 @@ export default function Whiteboard() {
                     onLock={() => HandleLockElement()}
                 />
             </div>
+            <div className="absolute right-15 bottom-5 z-50">
+                <Button size={"lg"} onClick={() => setShowAiSidebar(!showAiSidebar)}>
+                    <Sparkle /> AI
+                </Button>
+            </div>
+            {showAiSidebar && (
+                <AIFloatingSidebar
+                    excalidrawApi={excalidrawAPI}
+                    onClose={() => setShowAiSidebar(false)}
+                    onGenerate={(prompt: string, tool: string) => {
+                        console.log(prompt, tool);
+                    }}
+                />
+            )}
         </div>
     )
 }
