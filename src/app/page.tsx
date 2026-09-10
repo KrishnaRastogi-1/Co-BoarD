@@ -1,9 +1,14 @@
-import Image from "next/image";
 
-export default function Home() {
-  return (
-    <div>
-      Hey
-    </div>
-  )
+import { auth } from '@clerk/nextjs/server'
+import { redirect } from 'next/navigation'
+
+
+export default async function Home() {
+  const session = await auth()
+
+  if (session) {
+    redirect('/dashboard')
+  } else {
+    redirect('/login')
+  }
 }
