@@ -38,7 +38,6 @@ export default function CreateNewBoardDialog() {
             projectName: workspaceName,
             projectId: projectId,
         });
-        console.log(result?.data);
         toast.add({
             type: "success",
             title: "New Workspace Created"

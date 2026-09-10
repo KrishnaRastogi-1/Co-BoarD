@@ -136,7 +136,6 @@ export default function Whiteboard({ onApiReady, onSaveReady }: Props) {
                 projectId: projectId,
                 base64ImagePreview: base64ImagePreview
             });
-            console.log("Save response:", result.data);
         } catch (err) {
             console.error("Save failed:", err);
         }

@@ -423,7 +423,6 @@ export default function AIFloatingSidebar({
         await renderAIDiagram(result.data.diagramResult);
       }
 
-      console.log("AI diagram generated:", result.data);
       onGenerate(description, selectedTool.name);
       setUserInput("");
     } catch (error) {

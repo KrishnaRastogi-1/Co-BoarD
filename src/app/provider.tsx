@@ -14,7 +14,6 @@ export default function Provider({ children }: { children: React.ReactNode }) {
         const createNewUser = async () => {
             try {
                 const result = await axios.post("/api/users");
-                console.log(result.data);
                 setUserDetails(result.data);
             } catch (err) {
                 console.error("Failed to sync user:", err);
