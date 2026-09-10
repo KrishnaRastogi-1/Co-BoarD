@@ -11,6 +11,7 @@ import { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import FloatingProperties from "./floatingProperties";
 import { Button } from "@/components/ui/button";
 import AIFloatingSidebar from "./aiFloatingSidebar";
+import { exportToBlob } from "@excalidraw/excalidraw";
 
 const tools = [
     {
@@ -71,7 +72,11 @@ const Excalidraw = dynamic(
     { ssr: false }
 );
 
-export default function Whiteboard() {
+type Props = {
+    onApiReady: (api: ExcalidrawImperativeAPI | null) => void
+}
+
+export default function Whiteboard({ onApiReady }: Props) {
     const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawImperativeAPI | null>(null);
     const saveTimeRef = useRef<any>(null);
     const { projectId } = useParams();
@@ -101,28 +106,73 @@ export default function Whiteboard() {
         if (saveTimeRef?.current) {
             clearTimeout(saveTimeRef.current)
         }
-        // saveTimeRef.current = setTimeout(() => {
-        //     SaveCanvasChange(elements, appState, files);
-        //     toast.add({
-        //         title: "Changes Saved",
-        //         type: "success"
-        //     })
-        // }, 2000)
+        saveTimeRef.current = setTimeout(() => {
+            SaveCanvasChange(elements, appState, files);
+            toast.add({
+                title: "Changes Saved",
+                type: "success"
+            })
+        }, 10000)
     }
 
     const SaveCanvasChange = async (elements: readonly any[], appState: any, files: any) => {
         try {
+
+            const base64ImagePreview = await generatePreviewBase64();
             const result = await axios.post("/api/whiteboard", {
                 elements: elements,
                 appState: appState,
                 files: files,
-                projectId: projectId
+                projectId: projectId,
+                base64ImagePreview: base64ImagePreview
             });
             console.log("Save response:", result.data);
         } catch (err) {
             console.error("Save failed:", err);
         }
     }
+
+    const generatePreviewBase64 = async () => {
+        if (!excalidrawAPI) return null
+
+        const elements = excalidrawAPI.getSceneElements()
+
+        if (!elements.length) return null
+
+        const appState = excalidrawAPI.getAppState()
+        const files = excalidrawAPI.getFiles()
+
+        const blob = await exportToBlob({
+            elements,
+            appState: {
+                ...appState,
+                exportBackground: true,
+                exportWithDarkMode: false
+            },
+            files,
+            mimeType: "image/webp",
+            quality: 0.5,
+            getDimensions: () => ({
+                width: 400,
+                height: 225,
+                scale: 1
+            })
+        })
+
+        return await blobToBase64(blob)
+    }
+
+    const blobToBase64 = (blob: Blob): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader()
+
+            reader.onloadend = () => resolve(reader.result as string)
+            reader.onerror = reject
+
+            reader.readAsDataURL(blob)
+        })
+    }
+
 
     const changeTool = (tool: any) => {
         if (!excalidrawAPI) return;
@@ -275,7 +325,7 @@ export default function Whiteboard() {
     return (
         <div style={{ height: "93vh" }}>
             <Excalidraw
-                excalidrawAPI={(api: any) => setExcalidrawAPI(api)}
+                excalidrawAPI={(api: any) => { setExcalidrawAPI(api); onApiReady(api) }}
                 onChange={handleCanvasChange}
             />
             <div className="absolute left-4 top-1/2 z-50 -translate-y-1/2 flex flex-col gap-1 rounded-2xl bg-white border p-1.5 shadow-xl">

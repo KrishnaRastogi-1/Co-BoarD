@@ -24,6 +24,7 @@ export const whiteBoardData = pgTable("whiteboardData", {
   elements: jsonb("elements"),
   appState: jsonb("appState"),
   files: jsonb("files"),
+  previewImage: text("preview_image"),
   updateAt: timestamp("updated_at").defaultNow().notNull()
 })
 

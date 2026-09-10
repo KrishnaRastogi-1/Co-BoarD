@@ -23,6 +23,9 @@ const loadExcalidrawConverter = async () => {
   return convertToExcalidrawElements;
 };
 
+const getSafeText = (value: unknown, fallback = "Untitled"): string =>
+  typeof value === "string" && value.trim() ? value : fallback;
+
 type Tool = {
   name: string;
   desc: string;
@@ -38,14 +41,17 @@ type Props = {
   onGenerate: (prompt: string, tool: string) => void;
 };
 
+type AIDiagram = {
+  title?: string;
+  width?: number;
+  height?: number;
+  elements: any[];
+  connections?: any[];
+};
+
 type AIGenerateResponse = {
   success: boolean;
-  diagramResult?: {
-    title?: string;
-    width?: number;
-    height?: number;
-    elements: any[];
-  };
+  diagramResult?: AIDiagram;
   message?: string;
 };
 
@@ -141,39 +147,39 @@ export default function AIFloatingSidebar({
     const placeholderElements = convertToExcalidrawElements(
       [
         {
-        type: "rectangle",
-        id: AI_PLACEHOLDER_IDS.container,
-        x: position.x,
-        y: position.y,
-        width: 420,
-        height: 250,
-        backgroundColor: "#f5f3ff",
-        strokeColor: "#d9cfff",
-        roughness: 0,
-        fillStyle: "solid",
-        strokeWidth: 2,
-        roundness: { type: 3 },
-      },
-      {
-        type: "text",
-        id: AI_PLACEHOLDER_IDS.title,
-        x: position.x + 24,
-        y: position.y + 28,
-        text: "Generating your diagram",
-        fontSize: 22,
-        fontFamily: 2,
-        strokeColor: "#312e81",
-      },
-      {
-        type: "text",
-        id: AI_PLACEHOLDER_IDS.subtitle,
-        x: position.x + 24,
-        y: position.y + 65,
-        text: "AI is turning your idea into editable elements…",
-        fontSize: 15,
-        fontFamily: 2,
-        strokeColor: "#64748b",
-      },
+          type: "rectangle",
+          id: AI_PLACEHOLDER_IDS.container,
+          x: position.x,
+          y: position.y,
+          width: 420,
+          height: 250,
+          backgroundColor: "#f5f3ff",
+          strokeColor: "#d9cfff",
+          roughness: 0,
+          fillStyle: "solid",
+          strokeWidth: 2,
+          roundness: { type: 3 },
+        },
+        {
+          type: "text",
+          id: AI_PLACEHOLDER_IDS.title,
+          x: position.x + 24,
+          y: position.y + 28,
+          text: "Generating your diagram",
+          fontSize: 22,
+          fontFamily: 2,
+          strokeColor: "#312e81",
+        },
+        {
+          type: "text",
+          id: AI_PLACEHOLDER_IDS.subtitle,
+          x: position.x + 24,
+          y: position.y + 65,
+          text: "AI is turning your idea into editable elements…",
+          fontSize: 15,
+          fontFamily: 2,
+          strokeColor: "#64748b",
+        },
         ...[
           [AI_PLACEHOLDER_IDS.skeleton1, 118, 250, "#ddd6fe"],
           [AI_PLACEHOLDER_IDS.skeleton2, 150, 340, "#e9e5ff"],
@@ -201,6 +207,193 @@ export default function AIFloatingSidebar({
     });
   };
 
+  const getConnectionPoints = (
+    fromNode: any,
+    toNode: any,
+    origin: { x: number; y: number },
+  ) => {
+    const fromX = origin.x + Number(fromNode.x || 0);
+    const fromY = origin.y + Number(fromNode.y || 0);
+    const fromWidth = Number(fromNode.width || 200);
+    const fromHeight = Number(fromNode.height || 80);
+
+    const toX = origin.x + Number(toNode.x || 0);
+    const toY = origin.y + Number(toNode.y || 0);
+    const toWidth = Number(toNode.width || 200);
+    const toHeight = Number(toNode.height || 80);
+
+    const fromCenterX = fromX + fromWidth / 2;
+    const fromCenterY = fromY + fromHeight / 2;
+    const toCenterX = toX + toWidth / 2;
+    const toCenterY = toY + toHeight / 2;
+
+    const dx = toCenterX - fromCenterX;
+    const dy = toCenterY - fromCenterY;
+
+    // Vertical connection
+    if (Math.abs(dy) >= Math.abs(dx)) {
+      if (dy > 0) {
+        return {
+          startX: fromCenterX,
+          startY: fromY + fromHeight,
+          endX: toCenterX,
+          endY: toY,
+        };
+      }
+      return {
+        startX: fromCenterX,
+        startY: fromY,
+        endX: toCenterX,
+        endY: toY + toHeight,
+      };
+    }
+
+    // Horizontal connection
+    if (dx > 0) {
+      return {
+        startX: fromX + fromWidth,
+        startY: fromCenterY,
+        endX: toX,
+        endY: toCenterY,
+      };
+    }
+
+    return {
+      startX: fromX,
+      startY: fromCenterY,
+      endX: toX + toWidth,
+      endY: toCenterY,
+    };
+  };
+
+  const renderAIDiagram = async (diagram: AIDiagram) => {
+    if (!excalidrawApi) return;
+
+    const origin = getEmptyCanvasPosition();
+    const aiElements = diagram?.elements || [];
+    const connections = diagram?.connections || [];
+
+    if (!aiElements.length) return;
+
+    const getNode = (id: string) =>
+      aiElements.find((element: any) => element.id === id);
+
+    const shapeElements = aiElements.flatMap((element: any): any[] => {
+      if (!element?.type || !element?.id) return [];
+
+      const x = origin.x + (Number(element.x) || 0);
+      const y = origin.y + (Number(element.y) || 0);
+      const width = Number(element.width) || 200;
+      const height = Number(element.height) || 80;
+
+      const baseElement = {
+        id: element.id,
+        type: element.type,
+        x,
+        y,
+        width,
+        height,
+        strokeColor: element.strokeColor || "#1e1e1e",
+        backgroundColor: element.backgroundColor || "transparent",
+        strokeWidth: Number(element.strokeWidth) || 2,
+        strokeStyle: element.strokeStyle || "solid",
+        fillStyle: element.fillStyle || "solid",
+        roughness: element.roughness ?? 1,
+        opacity: element.opacity ?? 100,
+      };
+
+      if (element.type === "text") {
+        return [
+          {
+            ...baseElement,
+            text: getSafeText(element.text || element.label),
+            fontSize: Number(element.fontSize) || 18,
+          },
+        ];
+      }
+
+      const labelText = getSafeText(
+        typeof element.label === "object" && element.label !== null
+          ? element.label.text
+          : element.label ?? element.text,
+        "",
+      );
+
+      return [
+        {
+          ...baseElement,
+          ...(labelText && {
+            label: {
+              text: labelText,
+              fontSize: Number(element.fontSize) || 18,
+            },
+          }),
+        },
+      ];
+    });
+
+    const connectionElements = connections
+      .map((connection: any, index: number) => {
+        const fromNode = getNode(connection.from);
+        const toNode = getNode(connection.to);
+
+        if (!fromNode || !toNode) {
+          console.warn("Unable to create connection", connection);
+          return null;
+        }
+
+        const { startX, startY, endX, endY } = getConnectionPoints(
+          fromNode,
+          toNode,
+          origin,
+        );
+
+        return {
+          id: connection.id || `connection-${index}`,
+          type: "arrow",
+          x: startX,
+          y: startY,
+          width: endX - startX,
+          height: endY - startY,
+          start: { id: connection.from },
+          end: { id: connection.to },
+          strokeColor: connection.strokeColor || "#1e1e1e",
+          strokeWidth: Number(connection.strokeWidth) || 2,
+          strokeStyle: connection.strokeStyle || "solid",
+          roughness: connection.roughness ?? 1,
+          opacity: connection.opacity ?? 100,
+          startArrowhead: null,
+          endArrowhead: connection.endArrowhead || "arrow",
+          ...(connection.label && {
+            label: {
+              text: getSafeText(connection.label),
+              fontSize: Number(connection.fontSize) || 16,
+            },
+          }),
+        };
+      })
+      .filter(Boolean);
+
+    const elementsToConvert = [...shapeElements, ...connectionElements];
+
+    const convertToExcalidrawElements = await loadExcalidrawConverter();
+    const newElements = convertToExcalidrawElements(elementsToConvert as any, {
+      regenerateIds: false,
+    });
+
+    const currentElements = excalidrawApi.getSceneElements();
+
+    excalidrawApi.updateScene({
+      elements: [...currentElements, ...newElements],
+    });
+
+    // Uncomment to auto-scroll the generated diagram into view:
+    // excalidrawApi.scrollToContent(newElements, {
+    //   fitToViewport: true,
+    //   viewportZoomFactor: 0.8,
+    // });
+  };
+
   const handleGenerate = async () => {
     const description = userInput.trim();
     if (!description || !excalidrawApi) return;
@@ -224,26 +417,11 @@ export default function AIFloatingSidebar({
         throw new Error(result.data.message ?? "AI generation failed.");
       }
 
-      const generatedElements = result.data.diagramResult?.elements ?? [];
-      const safeElements = generatedElements.map((element) =>
-        element?.type === "text"
-          ? {
-              ...element,
-              text:
-                typeof element.text === "string" && element.text.trim()
-                  ? element.text
-                  : "Untitled",
-            }
-          : element,
-      );
-
-      const convertToExcalidrawElements = await loadExcalidrawConverter();
-      const newElements = convertToExcalidrawElements(safeElements);
-
       removeAiPlaceholder();
-      excalidrawApi.updateScene({
-        elements: [...excalidrawApi.getSceneElements(), ...newElements],
-      });
+
+      if (result.data.diagramResult) {
+        await renderAIDiagram(result.data.diagramResult);
+      }
 
       console.log("AI diagram generated:", result.data);
       onGenerate(description, selectedTool.name);

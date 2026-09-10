@@ -1,11 +1,12 @@
 import { db, whiteBoardData } from "@/db";
 import { currentUser } from "@clerk/nextjs/server";
+import { preventUnload } from "@excalidraw/excalidraw/utils";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
     try {
 
-        const { projectId, elements, files, appState} = await req.json();
+        const { projectId, elements, files, appState, base64ImagePreview } = await req.json();
     
         const user = await currentUser();
     
@@ -21,13 +22,15 @@ export async function POST(req: NextRequest) {
                 projectId: projectId,
                 elements: elements,
                 appState: appState,
-                files: files
+                files: files,
+                previewImage: base64ImagePreview
             }).onConflictDoUpdate({
                 target: [whiteBoardData.projectId],
                 set: {
                     elements: elements,
                     appState: appState,
                     files: files,
+                    previewImage: base64ImagePreview,
                     updateAt: new Date()
                 }
             })
