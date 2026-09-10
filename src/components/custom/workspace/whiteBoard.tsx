@@ -3,7 +3,7 @@ import { toast } from "@/components/ui/toast";
 import "@excalidraw/excalidraw/index.css";
 import axios from "axios";
 import { useParams } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import "./whiteboard.css"
 import { Hand, MousePointer, Square, Circle, Diamond, ArrowRight, Eraser, Pencil, TypeIcon, Image, Sparkle } from "lucide-react";
@@ -74,9 +74,10 @@ const Excalidraw = dynamic(
 
 type Props = {
     onApiReady: (api: ExcalidrawImperativeAPI | null) => void
+    onSaveReady?: (saveNow: () => Promise<void>) => void
 }
 
-export default function Whiteboard({ onApiReady }: Props) {
+export default function Whiteboard({ onApiReady, onSaveReady }: Props) {
     const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawImperativeAPI | null>(null);
     const saveTimeRef = useRef<any>(null);
     const { projectId } = useParams();
@@ -84,6 +85,12 @@ export default function Whiteboard({ onApiReady }: Props) {
     const [selectedElement, setSelectedElements] = useState<any>(null);
     const [canvasState, setCanvasState] = useState<any>(null);
     const [showAiSidebar, setShowAiSidebar] = useState(false);
+
+    const pendingSaveArgsRef = useRef<{
+        elements: readonly any[];
+        appState: any;
+        files: any;
+    } | null>(null);
 
     const handleCanvasChange = (elements: readonly any[], appState: any, files: any) => {
 
@@ -103,11 +110,14 @@ export default function Whiteboard({ onApiReady }: Props) {
             setSelectedElements(null);
         }
 
+        pendingSaveArgsRef.current = { elements, appState, files };
+
         if (saveTimeRef?.current) {
             clearTimeout(saveTimeRef.current)
         }
         saveTimeRef.current = setTimeout(() => {
             SaveCanvasChange(elements, appState, files);
+            pendingSaveArgsRef.current = null;
             toast.add({
                 title: "Changes Saved",
                 type: "success"
@@ -173,6 +183,46 @@ export default function Whiteboard({ onApiReady }: Props) {
         })
     }
 
+
+    const saveNow = async () => {
+        if (!excalidrawAPI) return;
+
+        if (saveTimeRef.current) {
+            clearTimeout(saveTimeRef.current);
+            saveTimeRef.current = null;
+        }
+
+        const elements = excalidrawAPI.getSceneElements();
+        const appState = excalidrawAPI.getAppState();
+        const files = excalidrawAPI.getFiles();
+
+        await SaveCanvasChange(elements, appState, files);
+        toast.add({
+            title: "Changes Saved",
+            type: "success"
+        });
+    }
+
+    useEffect(() => {
+        if (excalidrawAPI) {
+            onSaveReady?.(saveNow);
+        }
+    }, [excalidrawAPI]);
+
+    // Flush any pending debounced save immediately if the whiteboard unmounts
+    // (e.g. navigating back to the dashboard) before the 10s timer fires —
+    // cancelling outright would silently lose the last few seconds of edits.
+    useEffect(() => {
+        return () => {
+            if (saveTimeRef.current) {
+                clearTimeout(saveTimeRef.current);
+                const pending = pendingSaveArgsRef.current;
+                if (pending) {
+                    SaveCanvasChange(pending.elements, pending.appState, pending.files);
+                }
+            }
+        };
+    }, []);
 
     const changeTool = (tool: any) => {
         if (!excalidrawAPI) return;

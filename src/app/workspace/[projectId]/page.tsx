@@ -17,6 +17,7 @@ type WhiteboardResponse = {
   appState: any;
   files: BinaryFiles | null;
   projectName: string;
+  previewImage?: string | null;
 };
 
 // JSON storage turns Excalidraw's collaborators Map into a plain object.
@@ -32,6 +33,9 @@ export default function Workspace() {
     useState<ExcalidrawImperativeAPI | null>(null);
   const { projectId } = useParams<{ projectId: string }>();
   const [projectName, setProjectName] = useState("");
+  const [saveNow, setSaveNow] = useState<(() => Promise<void>) | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [needsInitialPreview, setNeedsInitialPreview] = useState(false);
 
 
   useEffect(() => {
@@ -51,6 +55,14 @@ export default function Workspace() {
         if (result.data.files) {
           excalidrawAPI.addFiles(Object.values(result.data.files));
         }
+
+        // If this board already has content but no preview thumbnail yet
+        // (e.g. it was created or edited before the preview feature, or the
+        // 10s auto-save debounce never got a chance to fire), generate one
+        // right away instead of waiting on a debounce or a manual edit.
+        if (!result.data.previewImage && (result.data.elements?.length ?? 0) > 0) {
+          setNeedsInitialPreview(true);
+        }
       } catch (error) {
         console.error("Failed to load whiteboard:", error);
       }
@@ -58,6 +70,16 @@ export default function Workspace() {
 
     void loadWhiteboard();
   }, [projectId, excalidrawAPI]);
+
+  // Runs once both the loaded board tells us it needs a preview AND the
+  // save function has been handed up from Whiteboard — order-independent,
+  // since this re-checks whenever either piece becomes available.
+  useEffect(() => {
+    if (needsInitialPreview && saveNow) {
+      saveNow();
+      setNeedsInitialPreview(false);
+    }
+  }, [needsInitialPreview, saveNow]);
 
   const handleExportImage = async () => {
     if (!excalidrawAPI) return;
@@ -82,15 +104,30 @@ export default function Workspace() {
     URL.revokeObjectURL(url);
   };
 
+  const handleManualSave = async () => {
+    if (!saveNow) return;
+    setIsSaving(true);
+    try {
+      await saveNow();
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div>
       <WorkspaceHeader
         selectedTab={setActiveTab}
         onExport={handleExportImage}
+        onSave={handleManualSave}
+        isSaving={isSaving}
         projectName={projectName}
       />
       {activeTab === "whiteboard" ? (
-        <Whiteboard onApiReady={setExcalidrawAPI} />
+        <Whiteboard
+          onApiReady={setExcalidrawAPI}
+          onSaveReady={(fn) => setSaveNow(() => fn)}
+        />
       ) : (
         <SmartDoc />
       )}

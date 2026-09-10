@@ -19,7 +19,7 @@ interface ProjectItem {
 
 export default function ProjectList() {
     const [projectList, setProjectList] = useState<ProjectItem[]>([]);
-    const [deletingId, setDeletingId] = useState<number | null>(null);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
     useEffect(() => {
         GetProjectList();
@@ -34,14 +34,14 @@ export default function ProjectList() {
         }
     }
 
-    const handleDelete = async (id: number) => {
+    const handleDelete = async (projectId: string) => {
         const confirmed = window.confirm("Delete this board? This can't be undone.");
         if (!confirmed) return;
 
-        setDeletingId(id);
+        setDeletingId(projectId);
         try {
-            await axios.delete(`/api/projects?projectId=${id}`);
-            setProjectList((prev) => prev.filter((project) => project.id !== id));
+            await axios.delete(`/api/projects?projectId=${projectId}`);
+            setProjectList((prev) => prev.filter((project) => project.projectId !== projectId));
         } catch (error) {
             console.error("Error deleting project:", error);
         } finally {
@@ -105,12 +105,12 @@ export default function ProjectList() {
                                         onClick={(e) => {
                                             e.preventDefault();
                                             e.stopPropagation();
-                                            handleDelete(project.id);
+                                            handleDelete(project.projectId);
                                         }}
-                                        disabled={deletingId === project.id}
+                                        disabled={deletingId === project.projectId}
                                         className="h-8 w-8 shrink-0 text-slate-400 hover:bg-red-50 hover:text-red-600"
                                     >
-                                        {deletingId === project.id ? (
+                                        {deletingId === project.projectId ? (
                                             <Loader2Icon className="h-4 w-4 animate-spin" />
                                         ) : (
                                             <Trash2 className="h-4 w-4" />

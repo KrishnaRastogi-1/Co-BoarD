@@ -118,3 +118,48 @@ export async function GET(req: NextRequest) {
   }
 }
 
+export async function DELETE(req: NextRequest) {
+  try {
+    const projectId = req.nextUrl.searchParams.get("projectId");
+    const user = await currentUser();
+    const email = user?.primaryEmailAddress?.emailAddress;
+
+    if (!email) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!projectId) {
+      return NextResponse.json(
+        { error: "Project information missing" },
+        { status: 400 }
+      );
+    }
+
+    const [userProject] = await db
+      .select()
+      .from(projects)
+      .where(
+        and(eq(projects.projectId, projectId), eq(projects.userEmail, email))
+      );
+
+    if (!userProject) {
+      return NextResponse.json(
+        { error: "Unauthorized user" },
+        { status: 403 }
+      );
+    }
+    await db
+      .delete(whiteBoardData)
+      .where(eq(whiteBoardData.projectId, projectId));
+
+    await db.delete(projects).where(eq(projects.projectId, projectId));
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Failed to delete project:", error);
+    return NextResponse.json(
+      { error: "Failed to delete project" },
+      { status: 500 }
+    );
+  }
+}
